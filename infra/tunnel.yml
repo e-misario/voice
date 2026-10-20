@@ -1,0 +1,10 @@
+tunnel: 3592a378-bcba-49dc-a5b6-3f028532c55d
+credentials-file: /etc/cloudflared/creds/3592a378-bcba-49dc-a5b6-3f028532c55d.json
+protocol: http2
+
+ingress:
+  - hostname: voice.e-misario.com
+    service: http://gateway:80
+  - hostname: vioce.e-misario.com
+    service: http://gateway:80
+  - service: http_status:404

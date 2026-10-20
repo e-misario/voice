@@ -109,14 +109,15 @@ services:
     networks:
       - emisario_voice_net
 
-  # Cloudflare Tunnel Dedicado para voice.e-misario.com
+  # Cloudflare Tunnel Dedicado para voice.e-misario.com y vioce.e-misario.com
   cloudflared:
     image: cloudflare/cloudflared:latest
     container_name: emisario_voice_cloudflared
     restart: unless-stopped
-    command: tunnel --no-autoupdate run
-    environment:
-      - TUNNEL_TOKEN=${CLOUDFLARE_TUNNEL_TOKEN}
+    command: tunnel --no-autoupdate --config /etc/cloudflared/tunnel.yml run
+    volumes:
+      - ./tunnel.yml:/etc/cloudflared/tunnel.yml:ro
+      - ~/.cloudflared/3592a378-bcba-49dc-a5b6-3f028532c55d.json:/etc/cloudflared/creds/3592a378-bcba-49dc-a5b6-3f028532c55d.json:ro
     networks:
       - emisario_voice_net
     depends_on:
