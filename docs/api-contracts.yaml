@@ -1,0 +1,129 @@
+openapi: 3.1.0
+info:
+  title: E-MIS@RIO SAS Voice AI API
+  description: API Multi-tenant para el SaaS de Voz con IA y VoiceStudio
+  version: 1.0.0
+servers:
+  - url: https://voice.e-misario.com/api/v1
+    description: Servidor de Producción (Cloudflare Tunnel)
+  - url: http://localhost:8000/api/v1
+    description: Servidor Local de Desarrollo
+paths:
+  /auth/login:
+    post:
+      summary: Iniciar sesión y obtener token JWT
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                email: { type: string }
+                password: { type: string }
+      responses:
+        '200':
+          description: Autenticación exitosa
+  /pricing/geo:
+    get:
+      summary: Obtener precios locales adaptados por país (geolocalización o parámetro)
+      parameters:
+        - name: country
+          in: query
+          required: false
+          schema: { type: string, example: "CO" }
+      responses:
+        '200':
+          description: Precios en moneda local y reglas de redondeo
+  /tenants:
+    get:
+      summary: Listar inquilinos (Superadmin)
+      responses:
+        '200':
+          description: Lista de tenants
+    post:
+      summary: Crear un nuevo inquilino
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name: { type: string }
+                slug: { type: string }
+                admin_email: { type: string }
+                admin_password: { type: string }
+      responses:
+        '201':
+          description: Inquilino registrado
+  /voice/clone:
+    post:
+      summary: Clonar voz a partir de muestra de audio (VoiceStudio)
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                name: { type: string }
+                audio_file: { type: string, format: binary }
+                language: { type: string, example: "es" }
+      responses:
+        '200':
+          description: Voz clonada exitosamente
+  /voice/tts:
+    post:
+      summary: Sintetizar texto a voz con IA (VoiceStudio)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                text: { type: string }
+                voice_id: { type: string }
+                emotion: { type: string, example: "neutral" }
+                speed: { type: number, default: 1.0 }
+      responses:
+        '200':
+          description: Audio generado en formato WAV o MP3
+  /voice/asr:
+    post:
+      summary: Transcribir audio a texto (VoiceStudio / Whisper)
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                audio_file: { type: string, format: binary }
+                language: { type: string, example: "auto" }
+      responses:
+        '200':
+          description: Transcripción con timestamps
+  /tenants/{tenant_id}/integrations/{kind}:
+    get:
+      summary: Obtener configuración de integración (enmascarada)
+      responses:
+        '200':
+          description: Detalles de la integración
+    put:
+      summary: Guardar o actualizar configuración de integración
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        '200':
+          description: Integración actualizada
+    post:
+      summary: Probar conexión de la integración
+      responses:
+        '200':
+          description: Resultado de la prueba de conexión

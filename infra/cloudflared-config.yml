@@ -1,0 +1,29 @@
+# Configuración de Túnel Cloudflare para E-MIS@RIO SAS Voice AI
+# Convivencia multi-túnel en VPS: se aísla por nombre de túnel e ingress hostname
+
+tunnel: voice-e-misario
+credentials-file: /etc/cloudflared/voice-e-misario.json
+
+ingress:
+  # Dominio oficial principal
+  - hostname: voice.e-misario.com
+    service: http://localhost:18095
+    originRequest:
+      noTLSVerify: true
+      connectTimeout: 30s
+
+  # Soporte de subdominios para multi-tenancy (tenant.voice.e-misario.com)
+  - hostname: "*.voice.e-misario.com"
+    service: http://localhost:18095
+    originRequest:
+      noTLSVerify: true
+      connectTimeout: 30s
+
+  # Alias solicitado por el usuario
+  - hostname: vioce.e-misario.com
+    service: http://localhost:18095
+    originRequest:
+      noTLSVerify: true
+
+  # Regla final de descarte (Catch-all)
+  - service: http_status:404
