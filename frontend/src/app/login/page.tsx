@@ -6,10 +6,11 @@ import Link from 'next/link';
 import { Mic, Shield, Building, Lock, Mail, ArrowRight, CheckCircle, AlertCircle, Sparkles } from 'lucide-react';
 import { Navbar } from '@/components/Navbar';
 import { Footer } from '@/components/Footer';
+import { loginUser } from '@/lib/api';
 
 export default function LoginPage() {
   const router = useRouter();
-  const [roleMode, setRoleMode] = useState<'superadmin' | 'tenant'>('tenant');
+  const [roleMode, setRoleMode] = useState<'superadmin' | 'tenant'>('superadmin');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [tenantSlug, setTenantSlug] = useState('');
@@ -36,35 +37,11 @@ export default function LoginPage() {
     setErrorMsg(null);
 
     try {
-      const res = await fetch('http://localhost:8000/api/v1/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password }),
-      });
-
-      if (!res.ok) {
-        // Si el backend no tiene ese usuario registrado, permitir acceso de demo con JWT simulado
-        if (roleMode === 'superadmin' && email === 'admin@e-misario.com') {
-          localStorage.setItem('emisario_auth_token', 'demo-superadmin-token');
-          localStorage.setItem('emisario_auth_role', 'superadmin');
-          localStorage.setItem('emisario_auth_email', email);
-          router.push('/admin');
-          return;
-        } else if (roleMode === 'tenant') {
-          localStorage.setItem('emisario_auth_token', 'demo-tenant-token');
-          localStorage.setItem('emisario_auth_role', 'tenant_admin');
-          localStorage.setItem('emisario_auth_tenant_slug', tenantSlug || 'empresa-demo');
-          localStorage.setItem('emisario_auth_email', email);
-          router.push('/dashboard');
-          return;
-        }
-        throw new Error('Credenciales incorrectas');
-      }
-
-      const data = await res.json();
+      const data = await loginUser(email, password);
       localStorage.setItem('emisario_auth_token', data.access_token);
       localStorage.setItem('emisario_auth_role', data.role);
       localStorage.setItem('emisario_auth_email', data.email);
+      localStorage.setItem('emisario_auth_name', data.full_name);
       if (data.tenant_id) {
         localStorage.setItem('emisario_auth_tenant_id', data.tenant_id);
       }
@@ -75,18 +52,7 @@ export default function LoginPage() {
         router.push('/dashboard');
       }
     } catch (err: any) {
-      // Fallback amigable para pruebas si no responde el backend
-      if (roleMode === 'superadmin') {
-        localStorage.setItem('emisario_auth_token', 'demo-superadmin-token');
-        localStorage.setItem('emisario_auth_role', 'superadmin');
-        localStorage.setItem('emisario_auth_email', email);
-        router.push('/admin');
-      } else {
-        localStorage.setItem('emisario_auth_token', 'demo-tenant-token');
-        localStorage.setItem('emisario_auth_role', 'tenant_admin');
-        localStorage.setItem('emisario_auth_email', email);
-        router.push('/dashboard');
-      }
+      setErrorMsg(err.message || 'Credenciales incorrectas');
     } finally {
       setLoading(false);
     }

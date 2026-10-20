@@ -392,3 +392,25 @@ export async function deleteMeeting(meetingId: string): Promise<boolean> {
   });
   return res.ok;
 }
+
+export async function loginUser(email: string, password: string): Promise<{
+  access_token: string;
+  token_type: string;
+  role: string;
+  tenant_id?: string;
+  user_id: string;
+  email: string;
+  full_name: string;
+}> {
+  const res = await fetch(`${API_BASE_URL}/auth/login`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email, password }),
+  });
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({}));
+    throw new Error(errorData.detail || 'Correo o contraseña incorrectos');
+  }
+  return await res.json();
+}
+

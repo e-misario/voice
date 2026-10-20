@@ -25,6 +25,10 @@ import {
   ExternalLink,
   Layers,
   Database,
+  Lock,
+  LogOut,
+  Key,
+  ShieldCheck,
 } from 'lucide-react';
 import { Navbar } from '@/components/Navbar';
 import { Footer } from '@/components/Footer';
@@ -40,11 +44,19 @@ import {
   deleteTenant,
   fetchHomeCMS,
   updateHomeCMS,
+  loginUser,
   DEFAULT_HOME_CMS,
 } from '@/lib/api';
 import { CountryPricing, Tenant, RoundingRule, HomeCMSConfig } from '@/types';
 
 export default function SuperadminPage() {
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
+  const [authEmail, setAuthEmail] = useState<string>('admin@e-misario.com');
+  const [authPassword, setAuthPassword] = useState<string>('');
+  const [authLoading, setAuthLoading] = useState<boolean>(false);
+  const [authError, setAuthError] = useState<string | null>(null);
+  const [currentSuperadminEmail, setCurrentSuperadminEmail] = useState<string>('');
+
   const [activeTab, setActiveTab] = useState<'cms' | 'pricing' | 'tenants' | 'system'>('pricing');
   const [pricingList, setPricingList] = useState<CountryPricing[]>([]);
   const [tenants, setTenants] = useState<Tenant[]>([]);
@@ -115,8 +127,54 @@ export default function SuperadminPage() {
   };
 
   useEffect(() => {
-    loadData();
+    const token = typeof window !== 'undefined' ? localStorage.getItem('emisario_auth_token') : null;
+    const role = typeof window !== 'undefined' ? localStorage.getItem('emisario_auth_role') : null;
+    const email = typeof window !== 'undefined' ? localStorage.getItem('emisario_auth_email') : null;
+
+    if (token && role === 'superadmin') {
+      setIsAuthenticated(true);
+      setCurrentSuperadminEmail(email || 'admin@e-misario.com');
+      loadData();
+    } else {
+      setIsAuthenticated(false);
+      setLoading(false);
+    }
   }, []);
+
+  const handleSuperadminLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setAuthLoading(true);
+    setAuthError(null);
+
+    try {
+      const data = await loginUser(authEmail, authPassword);
+      if (data.role !== 'superadmin') {
+        throw new Error('Esta cuenta no posee privilegios de Administrador Global (Superadmin).');
+      }
+      localStorage.setItem('emisario_auth_token', data.access_token);
+      localStorage.setItem('emisario_auth_role', data.role);
+      localStorage.setItem('emisario_auth_email', data.email);
+      localStorage.setItem('emisario_auth_name', data.full_name);
+      setCurrentSuperadminEmail(data.email);
+      setIsAuthenticated(true);
+      showNotification('¡Bienvenido a la Consola Superadmin de E-MIS@RIO SAS!');
+      loadData();
+    } catch (err: any) {
+      setAuthError(err.message || 'Credenciales de Superadmin incorrectas');
+    } finally {
+      setAuthLoading(false);
+    }
+  };
+
+  const handleLogout = () => {
+    localStorage.removeItem('emisario_auth_token');
+    localStorage.removeItem('emisario_auth_role');
+    localStorage.removeItem('emisario_auth_email');
+    localStorage.removeItem('emisario_auth_name');
+    setIsAuthenticated(false);
+    setAuthPassword('');
+    showNotification('Sesión cerrada correctamente');
+  };
 
   // Guardar CMS
   const handleSaveCMS = async (e: React.FormEvent) => {
@@ -504,6 +562,122 @@ export default function SuperadminPage() {
     },
   ];
 
+  // Si no está autenticado como Superadmin, exigir credenciales
+  if (isAuthenticated === false) {
+    return (
+      <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col justify-between">
+        <Navbar />
+
+        <main className="flex-1 flex items-center justify-center px-4 sm:px-6 lg:px-8 py-16">
+          <div className="max-w-md w-full bg-slate-900/80 border border-slate-800 rounded-2xl p-8 shadow-2xl backdrop-blur-md">
+            {/* Header del Login Superadmin */}
+            <div className="text-center mb-8">
+              <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-indigo-600 to-cyan-500 flex items-center justify-center mx-auto mb-4 text-white shadow-xl shadow-indigo-500/20">
+                <ShieldCheck className="w-8 h-8" />
+              </div>
+              <h1 className="text-2xl font-black text-white tracking-tight">Consola Superadmin</h1>
+              <p className="text-xs text-slate-400 mt-1.5">
+                E-MIS@RIO SAS · Acceso estrictamente restringido con credenciales maestras.
+              </p>
+            </div>
+
+            {authError && (
+              <div className="mb-5 p-3.5 bg-red-500/10 border border-red-500/30 rounded-xl text-red-400 text-xs flex items-center gap-2.5">
+                <AlertCircle className="w-4 h-4 shrink-0" />
+                <span>{authError}</span>
+              </div>
+            )}
+
+            <form onSubmit={handleSuperadminLogin} className="space-y-4">
+              <div>
+                <label className="block text-xs text-slate-300 font-semibold mb-1.5">
+                  Correo Electrónico de Superadmin
+                </label>
+                <div className="flex items-center bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 focus-within:border-indigo-500 focus-within:ring-1 focus-within:ring-indigo-500/30 transition-all">
+                  <Shield className="w-4 h-4 text-slate-500 mr-2.5" />
+                  <input
+                    type="email"
+                    required
+                    value={authEmail}
+                    onChange={(e) => setAuthEmail(e.target.value)}
+                    placeholder="admin@e-misario.com"
+                    className="w-full bg-transparent text-xs text-white focus:outline-none"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="block text-xs text-slate-300 font-semibold">
+                    Contraseña Maestra
+                  </label>
+                  <span className="text-[10px] text-slate-500">Cifrado bcrypt</span>
+                </div>
+                <div className="flex items-center bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 focus-within:border-indigo-500 focus-within:ring-1 focus-within:ring-indigo-500/30 transition-all">
+                  <Lock className="w-4 h-4 text-slate-500 mr-2.5" />
+                  <input
+                    type="password"
+                    required
+                    value={authPassword}
+                    onChange={(e) => setAuthPassword(e.target.value)}
+                    placeholder="••••••••••••"
+                    className="w-full bg-transparent text-xs text-white focus:outline-none"
+                  />
+                </div>
+              </div>
+
+              <button
+                type="submit"
+                disabled={authLoading}
+                className="w-full mt-2 py-3 bg-gradient-to-r from-indigo-600 via-indigo-500 to-cyan-500 hover:from-indigo-500 hover:to-cyan-400 text-white font-bold text-xs rounded-xl shadow-lg shadow-indigo-600/25 transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+              >
+                {authLoading ? (
+                  <>
+                    <RefreshCw className="w-4 h-4 animate-spin" />
+                    <span>Verificando credenciales...</span>
+                  </>
+                ) : (
+                  <>
+                    <Key className="w-4 h-4" />
+                    <span>Ingresar a la Consola de Administración</span>
+                  </>
+                )}
+              </button>
+            </form>
+
+            <div className="mt-6 pt-5 border-t border-slate-800 text-center">
+              <Link
+                href="/"
+                className="text-xs text-slate-500 hover:text-white transition-colors inline-flex items-center justify-center gap-1.5"
+              >
+                <ArrowLeft className="w-3.5 h-3.5" />
+                <span>Volver a la página principal</span>
+              </Link>
+            </div>
+          </div>
+        </main>
+
+        <Footer />
+      </div>
+    );
+  }
+
+  // Loader inicial mientras se comprueba localStorage
+  if (isAuthenticated === null) {
+    return (
+      <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col justify-between">
+        <Navbar />
+        <main className="flex-1 flex items-center justify-center py-20">
+          <div className="flex flex-col items-center gap-3">
+            <RefreshCw className="w-8 h-8 text-indigo-400 animate-spin" />
+            <span className="text-xs text-slate-400">Verificando sesión segura...</span>
+          </div>
+        </main>
+        <Footer />
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col">
       <Navbar />
@@ -524,6 +698,11 @@ export default function SuperadminPage() {
           </div>
 
           <div className="flex items-center gap-2">
+            <div className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo-500/10 border border-indigo-500/20 text-[11px] text-indigo-300 font-mono">
+              <Shield className="w-3.5 h-3.5 text-indigo-400" />
+              <span>{currentSuperadminEmail || 'admin@e-misario.com'}</span>
+            </div>
+
             <button
               onClick={loadData}
               disabled={loading}
@@ -532,6 +711,16 @@ export default function SuperadminPage() {
               <RefreshCw className={`w-3.5 h-3.5 text-cyan-400 ${loading ? 'animate-spin' : ''}`} />
               <span>Sincronizar</span>
             </button>
+
+            <button
+              onClick={handleLogout}
+              title="Cerrar Sesión Superadmin"
+              className="inline-flex items-center gap-1.5 bg-red-950/40 hover:bg-red-900/60 border border-red-800/60 text-xs text-red-300 hover:text-white px-3 py-2 rounded-lg transition-colors cursor-pointer"
+            >
+              <LogOut className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Cerrar Sesión</span>
+            </button>
+
             <Link
               href="/"
               className="inline-flex items-center gap-1.5 bg-slate-900 hover:bg-slate-800 border border-slate-800 text-xs text-slate-400 hover:text-white px-3 py-2 rounded-lg transition-colors"

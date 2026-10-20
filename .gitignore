@@ -36,3 +36,6 @@ yarn-error.log*
 .idea/
 .vscode/
 *.swp
+
+# Motores locales y modelos
+engine/
