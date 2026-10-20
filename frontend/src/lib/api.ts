@@ -169,6 +169,26 @@ export async function cloneVoice(
   return await res.json();
 }
 
+export async function createTenant(payload: {
+  name: string;
+  slug: string;
+  admin_email: string;
+  admin_password: string;
+  admin_name?: string;
+  custom_domain?: string;
+}): Promise<Tenant> {
+  const res = await fetch(`${API_BASE_URL}/tenants`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({}));
+    throw new Error(errorData.detail || 'Error al crear inquilino');
+  }
+  return await res.json();
+}
+
 export async function fetchTenants(): Promise<Tenant[]> {
   try {
     const res = await fetch(`${API_BASE_URL}/tenants`, { cache: 'no-store' });
@@ -187,7 +207,6 @@ export async function fetchTenants(): Promise<Tenant[]> {
     ];
   }
 }
-
 export async function fetchIntegrations(tenantId: string): Promise<Integration[]> {
   try {
     const res = await fetch(`${API_BASE_URL}/tenants/${tenantId}/integrations`, { cache: 'no-store' });
@@ -323,4 +342,53 @@ export async function updateHomeCMS(payload: HomeCMSConfig): Promise<HomeCMSConf
   });
   if (!res.ok) throw new Error('Error al actualizar CMS');
   return await res.json();
+}
+
+export async function createCountryPricing(payload: Partial<CountryPricing>): Promise<CountryPricing> {
+  const res = await fetch(`${API_BASE_URL}/pricing`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) throw new Error('No se pudo crear el país y precio');
+  return await res.json();
+}
+
+export async function deleteCountryPricing(countryCode: string): Promise<boolean> {
+  const res = await fetch(`${API_BASE_URL}/pricing/${encodeURIComponent(countryCode)}`, {
+    method: 'DELETE',
+  });
+  return res.ok;
+}
+
+export async function updateTenant(tenantId: string, payload: Partial<Tenant>): Promise<Tenant> {
+  const res = await fetch(`${API_BASE_URL}/tenants/${tenantId}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) throw new Error('No se pudo actualizar el inquilino');
+  return await res.json();
+}
+
+export async function deleteTenant(tenantId: string): Promise<boolean> {
+  const res = await fetch(`${API_BASE_URL}/tenants/${tenantId}`, {
+    method: 'DELETE',
+  });
+  return res.ok;
+}
+
+export async function deleteVoice(voiceId: string, tenantId: string = 'default-tenant-emisario'): Promise<boolean> {
+  const res = await fetch(`${API_BASE_URL}/voice/voices/${voiceId}`, {
+    method: 'DELETE',
+    headers: { 'X-Tenant-ID': tenantId },
+  });
+  return res.ok;
+}
+
+export async function deleteMeeting(meetingId: string): Promise<boolean> {
+  const res = await fetch(`${API_BASE_URL}/meetings/${meetingId}`, {
+    method: 'DELETE',
+  });
+  return res.ok;
 }

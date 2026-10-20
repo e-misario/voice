@@ -113,3 +113,54 @@ async def get_tenant_detail(tenant_id: str, db: AsyncSession = Depends(get_db)):
         created_at=tenant.created_at,
         updated_at=tenant.updated_at
     )
+
+
+@router.put("/{tenant_id}", response_model=TenantResponse, summary="Actualizar inquilino (Superadmin)")
+async def update_tenant(
+    tenant_id: str,
+    payload: TenantUpdate,
+    db: AsyncSession = Depends(get_db)
+):
+    """Actualiza datos, estado o cuotas del inquilino."""
+    stmt = select(Tenant).where((Tenant.id == tenant_id) | (Tenant.slug == tenant_id))
+    result = await db.execute(stmt)
+    tenant = result.scalar_one_or_none()
+    if not tenant:
+        raise HTTPException(status_code=404, detail="Inquilino no encontrado.")
+
+    if payload.name is not None:
+        tenant.name = payload.name
+    if payload.custom_domain is not None:
+        tenant.custom_domain = payload.custom_domain
+    if payload.status is not None:
+        tenant.status = payload.status
+    if payload.settings_json is not None:
+        tenant.settings_json = payload.settings_json
+
+    await db.commit()
+    await db.refresh(tenant)
+
+    return TenantResponse(
+        id=str(tenant.id),
+        slug=tenant.slug,
+        name=tenant.name,
+        custom_domain=tenant.custom_domain,
+        status=tenant.status,
+        settings_json=tenant.settings_json or {},
+        created_at=tenant.created_at,
+        updated_at=tenant.updated_at
+    )
+
+
+@router.delete("/{tenant_id}", summary="Eliminar inquilino (Superadmin)")
+async def delete_tenant(tenant_id: str, db: AsyncSession = Depends(get_db)):
+    """Elimina permanentemente un inquilino y sus datos asociados."""
+    stmt = select(Tenant).where((Tenant.id == tenant_id) | (Tenant.slug == tenant_id))
+    result = await db.execute(stmt)
+    tenant = result.scalar_one_or_none()
+    if not tenant:
+        raise HTTPException(status_code=404, detail="Inquilino no encontrado.")
+
+    await db.delete(tenant)
+    await db.commit()
+    return {"success": True, "message": f"Inquilino '{tenant.name}' eliminado con éxito."}

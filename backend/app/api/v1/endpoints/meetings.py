@@ -115,3 +115,17 @@ async def append_transcript(
         created_at=meeting.created_at,
         updated_at=meeting.updated_at
     )
+
+
+@router.delete("/meetings/{meeting_id}", summary="Eliminar reunión bilingüe")
+async def delete_meeting(meeting_id: str, db: AsyncSession = Depends(get_db)):
+    """Elimina una sala de reunión y sus transcripciones."""
+    stmt = select(Meeting).where(Meeting.id == meeting_id)
+    result = await db.execute(stmt)
+    meeting = result.scalar_one_or_none()
+    if not meeting:
+        raise HTTPException(status_code=404, detail="Reunión no encontrada.")
+
+    await db.delete(meeting)
+    await db.commit()
+    return {"success": True, "message": f"Reunión '{meeting.title}' eliminada con éxito."}

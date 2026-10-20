@@ -248,3 +248,63 @@ async def update_country_pricing(
         formatted_price=fmt,
         updated_at=pricing_record.updated_at
     )
+
+
+@router.post("", response_model=CountryPricingResponse, summary="Crear nuevo país y tarifa (Superadmin)")
+async def create_country_pricing(payload: CountryPricingCreate, db: AsyncSession = Depends(get_db)):
+    """Permite al Superadmin registrar una nueva tarifa y moneda para un país."""
+    code = payload.country_code.upper().strip()
+    stmt = select(CountryPricing).where(CountryPricing.country_code == code)
+    res = await db.execute(stmt)
+    if res.scalar_one_or_none():
+        raise HTTPException(status_code=400, detail=f"El país con código '{code}' ya existe.")
+
+    local_price = pricing_engine.calculate_price(
+        payload.usd_base_price, payload.exchange_rate, payload.margin_pct, payload.rounding_rule
+    )
+
+    new_country = CountryPricing(
+        country_code=code,
+        country_name=payload.country_name,
+        currency=payload.currency.upper().strip(),
+        usd_base_price=payload.usd_base_price,
+        exchange_rate=payload.exchange_rate,
+        margin_pct=payload.margin_pct,
+        calculated_local_price=local_price,
+        rounding_rule=payload.rounding_rule,
+        plan_tier=payload.plan_tier
+    )
+    db.add(new_country)
+    await db.commit()
+    await db.refresh(new_country)
+
+    fmt = pricing_engine.format_price(float(new_country.calculated_local_price), new_country.currency)
+    return CountryPricingResponse(
+        id=str(new_country.id),
+        country_code=new_country.country_code,
+        country_name=new_country.country_name,
+        currency=new_country.currency,
+        usd_base_price=float(new_country.usd_base_price),
+        exchange_rate=float(new_country.exchange_rate),
+        margin_pct=float(new_country.margin_pct),
+        calculated_local_price=float(new_country.calculated_local_price),
+        rounding_rule=new_country.rounding_rule,
+        plan_tier=new_country.plan_tier,
+        formatted_price=fmt,
+        updated_at=new_country.updated_at
+    )
+
+
+@router.delete("/{country_code}", summary="Eliminar país de la matriz de precios (Superadmin)")
+async def delete_country_pricing(country_code: str, db: AsyncSession = Depends(get_db)):
+    """Elimina una regla de precio por país de la base de datos."""
+    code = country_code.upper().strip()
+    stmt = select(CountryPricing).where(CountryPricing.country_code == code)
+    res = await db.execute(stmt)
+    record = res.scalar_one_or_none()
+    if not record:
+        raise HTTPException(status_code=404, detail="País no encontrado en la matriz de precios.")
+
+    await db.delete(record)
+    await db.commit()
+    return {"success": True, "message": f"País '{code}' eliminado de la matriz de precios."}

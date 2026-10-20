@@ -152,3 +152,18 @@ async def asr_endpoint(
         
     result = await voice_studio_service.transcribe(content, language=language)
     return ASRResponse(**result)
+
+
+@router.delete("/voices/{voice_id}", summary="Eliminar voz del inquilino")
+async def delete_voice_endpoint(voice_id: str, request: Request, db: AsyncSession = Depends(get_db)):
+    """Elimina una voz propia del catálogo del tenant."""
+    tenant_id = getattr(request.state, "tenant_id", None) or "default-tenant-emisario"
+    stmt = select(Voice).where((Voice.id == voice_id) & (Voice.tenant_id == tenant_id))
+    result = await db.execute(stmt)
+    voice = result.scalar_one_or_none()
+    if not voice:
+        raise HTTPException(status_code=404, detail="Voz no encontrada o no pertenece al inquilino.")
+
+    await db.delete(voice)
+    await db.commit()
+    return {"success": True, "message": f"Voz '{voice.name}' eliminada correctamente."}
